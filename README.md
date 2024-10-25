@@ -43,7 +43,7 @@ for (package in neededPackages) {
 ```
 # DETECTION OF FLOODED AREAS UNDER CLOUD COVER IN OPTICAL SYSTEMS: INTEGRATION WITH DIGITAL ELEVATION MODEL 
 
-This project is part of the dissertation work and includes a set of codes in R language. The codes address different stages of the process and have been developed to be quickly and easily replicable. The project proposes a method for detecting flooded areas in images partially covered by clouds, exploring the potential of hydrological and morphometric attributes extracted from a Digital Elevation Model (DEM) for identifying flood-prone areas, complementing the surface water mapping in optical images.
+This project is part of the masters thesis work and includes a set of codes in R language. The codes address different stages of the process and have been developed to be quickly and easily replicable. The project proposes a method for detecting flooded areas in images partially covered by clouds, exploring the potential of hydrological and morphometric attributes extracted from a Digital Elevation Model (DEM) for identifying flood-prone areas, complementing the surface water mapping in optical images.
 
 The set of codes includes:
 
