@@ -1,192 +1,138 @@
-library(rpart)
-library(rpart.plot)
+# 1 -    ==== CARREGAR OS ATRIBUTOS ESPECTRAIS ==== 
 
-# 1 - Carregar bibliotecas
+# Definir o diretório onde os arquivos estão localizados
+dir_path <- "Insira aqui seu diretório"
 
-neededPackages = c("raster", "stats", "sf", "ggplot2", "sp", "dplyr", "tidyr", "sp", "sf","ROCR",
-                   "reshape2", "randomForest", "caret", "caTools", "geobr", "prettymapr", "tidyselect" )
-pkgTest = function(x) { if (x %in% rownames(installed.packages()) == FALSE) { install.packages(x, dependencies= TRUE) }; library(x, character.only = TRUE) }
-for (package in neededPackages) { pkgTest(package) }
+# Listar todos os arquivos .tif na pasta
+files_list <- list.files(path = dir_path, pattern = "\\.tif$", full.names = TRUE)
 
-# Ler pasta com o atributo
+# Carregar os arquivos 
+rasters_list <- lapply(files_list, raster)
 
-WVCDI <- "D:\\Dissertação\\Nuvens e Sombras\\Índices_Correto\\WV_CDI.tif"
-WI<- "D:\\Dissertação\\Nuvens e Sombras\\Índices_Correto\\WI.tif"
-HOT <- "D:\\Dissertação\\Nuvens e Sombras\\Índices_Correto\\HOT.tif"
-SWIR_SCD <- "D:\\Dissertação\\Nuvens e Sombras\\Índices_Correto\\SWIR_SCD.tif"
-NIR_SCD <- "D:\\Dissertação\\Nuvens e Sombras\\Índices_Correto\\HOT_N32.tif"
-CI <- "D:\\Dissertação\\Nuvens e Sombras\\Índices_Correto\\Cloud Index.tif"
-Cirrus <- "D:\\Dissertação\\Nuvens e Sombras\\Índices_Correto\\Cirrus.tif"
-NIR_SCD16 <- "D:\\Dissertação\\Nuvens e Sombras\\Índices\\HOT_W.tif"
+# Nomear cada elemento da lista com o nome do arquivo (sem a extensão)
+names(rasters_list) <- tools::file_path_sans_ext(basename(files_list))
+print(rasters_list)
 
+# Criar o stack com os rasters da lista
+  # Para detalhes sobre os atributos, consulte o Mark Down Clouds_Shadows_Mask.md
+img <- stack(rasters_list[["WV"]],    
+             rasters_list[["WI"]],     
+             rasters_list[["HOT"]],    
+             rasters_list[["SWIR_SCD"]], 
+             rasters_list[["NIR-SCD"]], 
+             rasters_list[["Cloud Index"]], 
+             rasters_list[["Cirrus"]]) 
 
-# Criar stack com os atributos
-img <- stack(WVCDI, WI, HOT, SWIR_SCD, NIR_SCD, CI, Cirrus)
-# Ler como DataFrame
+plot(img)
 
-img.df <- data.frame(values(img))
+# 2 -    ==== ETAPA DE AMOSTRAGEM ==== 
 
-#   3 -    ==== AMOSTRAGEM ==== 
+# Carregar os shapefiles e padronizar o CRS para todos
+amostras <- list.files("D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\Amostras_Final", 
+                       pattern = ".shp", full.names = TRUE) %>%
+  lapply(st_read) %>%
+  lapply(function(x) st_transform(x, st_crs(4326))) # O CRS WGS84 está como exemplo, ajuste conforme necessário
 
-# um shp para cada classe na mesma pasta
-
-amostras = list.files("D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\Amostras_Final", pattern = ".shp", full.names = T)
-amostras = lapply(amostras, st_read) #junta os .shp em uma lista
-amostras[[2]] <- st_transform(amostras[[2]], st_crs(amostras[[1]])) # Converter o CRS do segundo conjunto de dados para o CRS do primeiro
-amostras_f = rbind(amostras[[1]], amostras[[2]]) #combina em um ?nico vetor
+# Combinar os shapefiles em um único objeto 'sf'
 amostras_f <- do.call(rbind, amostras)
-amostras_f <- st_as_sf(amostras_f)
-amostras_f <- as(st_as_sf(amostras_f), "Spatial")
-#Extrair valores dos raster para as amostras
 
+# Extrair valores dos rasters para os pontos das amostras
 atributos_amostras <- raster::extract(img, amostras_f)
-class(atributos_amostras)
 
-# Extrair atributos como um dataframe
+# Converter para dataframe e adicionar a coluna 'Classe'
 atributos_df <- as.data.frame(atributos_amostras)
-
-# Verificar a classe do dataframe
-class(atributos_df)
-# Acessar apenas os dados em amostras_f
 dados_amostras <- st_drop_geometry(amostras_f)
 
-
+# Atualizar a coluna 'id' para a classe desejada
 dados_amostras$id <- ifelse(dados_amostras$id == 3, 1, dados_amostras$id)
 
-
-# Unir a informacao da classe da amostra com os valores dos atributos
-
+# Unir os dados das classes com os atributos extraídos
 amostras_atributos <- data.frame(Classe = dados_amostras$id, atributos_df)
 
-print(amostras_atributos)
-
+# Separar as amostras em treino e teste (Neste caso, 70% para treino, ajuste conforme necessário.)
 index <- createDataPartition(amostras_atributos$Classe, p = 0.7, list = FALSE)
+treino_amostras <- amostras_atributos[index, ]
+teste_amostras <- amostras_atributos[-index, ]
 
-# Separando as amostras de treino e teste
-treino.amostras <- amostras_atributos[index, ]
-teste.amostras <- amostras_atributos[-index, ]
+print(amostras_atributos)
 
 ------------------------------------------------------------
   #   3 -    ==== MODELO R-PART ==== 
 
-# Modelo
-
-set.seed(125)
-filtrpart <- rpart(
-  treino.amostras$Classe ~ ., 
-  data = treino.amostras,
-  method = "class",
-  control = rpart.control(
-    minsplit = 1,
-    minbucket = round(1/3),
-    cp = 0.010,
-    maxcompete = 4, 
-    maxsurrogate = 10,
-    usesurrogate = 2, 
-    xval = 10,
-    surrogatestyle = 0, 
-    maxdepth = 30
-  )
-)
-
-
-print(filtrpart)
-plot(filtrpart)
-# Plotar a árvore de decisão 
-rpart.plot(
-  filtrpart,
-  box.palette = c("lightblue", "orange"),  # Cores para os nós
-  fallen.leaves = TRUE,  # nós terminais alinhadas à esquerda
-  type = 2,  
-  branch = 1,  # Formato dos ramos
-  branch.lty = 1,  # linha dos ramos
-  branch.lwd = 4,  # Largura da linha dos ramos
-  uniform = TRUE,  # Espaçamento uniforme entre os nós
-  main = "Detecção de Nuvens/Sombras",  # Título do gráfico
-  sub = " ",  # Subtítulo do gráfico
-  shadow.col = "white",  # Cor do texto (letras)
-  cex = 0.7  # tamanho do texto
-)
-
-print(filtrpart)
-------------------------------------------------------------
+treinar_e_avaliar <- function(dados) {
+  set.seed(100)  
+  num_folds <- 10 # Ajuste conforme necessário, valores entre 5 e 10 são indicados
+  folds <- createFolds(dados$Classe, k = num_folds, list = FALSE)  # Criação de cada um dos folds
   
-  #   4 -    ==== PREDIÇÃO ==== 
-
-rpart.pred <- raster::predict(img, filtrpart, progress = "text", type = "class")
-
-plot(rpart.pred)
-writeRaster(rpart.pred, "Class_rpart_Todos_atbA2if", overwrite = TRUE)
-
-#   5 -  ==== AVALIAÇÃO ==== 
-
-predictclass <- raster::predict(filtrpart, teste.amostras, progress = "text", type = "class")
-
-#levels(predictclass)
-#levels(teste.amostras$Classe)
-
-# Converter para mesma referência
-teste.amostras$Classe <- factor(teste.amostras$Classe, levels = levels(predictclass))
-
-
-MatrizConf.RF <- confusionMatrix(data = predictclass, reference = teste.amostras$Classe)
-print(MatrizConf.RF)
-
-
-precisão <- MatrizConf.RF$byClass["Precision"]
-sensibilidade <- MatrizConf.RF$byClass["Recall"]
-especificidade <- MatrizConf.RF$byClass["Specificity"] #vi no github mas não sei a potencialidade
-
-print(precisão)
-print(sensibilidade)
-print(especificidade)
-
-f1_score <- MatrizConf.RF$byClass["F1"]
-print(f1_score)
--------------------------------------------------------------------------------
-  #  6 -  ==== Validação-Cruzada K-Fold ====
-
-treinar_e_avaliar <- function(indice_treino, indice_teste, dados) {
+  metricas_df <- data.frame(Acuracia = numeric(num_folds),
+                            Sensibilidade = numeric(num_folds),
+                            Especificidade = numeric(num_folds),
+                            Precisao = numeric(num_folds),
+                            F1_Pontuacao = numeric(num_folds))
   
-  # Dados de treino e teste
-  dados_treino <- dados[indice_treino, ]
-  dados_teste <- dados[indice_teste, ]
-  
-  # Treinar o modelo (mesmas métricas selecionadas no modelo)
-  filtrpart <- rpart(
-    Classe ~ ., 
-    data = dados_treino,
-    method = "class",
-    control = rpart.control(
-      minsplit = 10,
-      minbucket = round (10/3),
-      cp = 0.001,
-      maxcompete = 4, 
-      maxsurrogate = 1,
-      usesurrogate = 2, 
-      xval = 10,
-      surrogatestyle = 0, 
-      maxdepth = 20
+  for (i in 1:num_folds) {
+    indice_treino <- which(folds != i)
+    indice_teste <- which(folds == i)
+    
+    # Dados de treino e teste
+    dados_treino <- dados[indice_treino, ]
+    dados_teste <- dados[indice_teste, ]
+    
+    # Treinar o modelo # Ajuste os hiperparâmetros conforme necessário, consulte o Mark Down Clouds_Shadows_Mask.md.
+    filtrpart <- rpart(
+      Classe ~ ., 
+      data = dados_treino,
+      method = "class",
+      control = rpart.control(
+        minsplit = 10,
+        minbucket = round(10 / 3),
+        cp = 0.001,
+        maxcompete = 4, 
+        maxsurrogate = 1,
+        usesurrogate = 2, 
+        xval = 0,  
+        surrogatestyle = 0, 
+        maxdepth = 20
+      )
     )
-  )
-  
-  # Avaliar 
-  classe_predita <- raster::predict(filtrpart, dados_teste, progress = "text", type = "class")
-  # Converter para a mesma referência
-  dados_teste$Classe <- factor(dados_teste$Classe, levels = levels(classe_predita))
-  MatrizConfusao <- confusionMatrix(data = classe_predita, reference = dados_teste$Classe)
-  
-  library(reshape2)
+    
+    # Avaliar
+    classe_predita <- predict(filtrpart, dados_teste, type = "class")
+    
+    # Converter para a mesma referência
+    dados_teste$Classe <- factor(dados_teste$Classe, levels = levels(classe_predita))
+    MatrizConfusao <- confusionMatrix(data = classe_predita, reference = dados_teste$Classe)
+    
+    # Armazenar métricas
+    metricas_df[i, "Acuracia"] <- MatrizConfusao$overall['Accuracy']
+    metricas_df[i, "Sensibilidade"] <- MatrizConfusao$byClass['Sensitivity']
+    metricas_df[i, "Especificidade"] <- MatrizConfusao$byClass['Specificity']
+    metricas_df[i, "Precisao"] <- MatrizConfusao$byClass['Precision']
+    metricas_df[i, "F1_Pontuacao"] <- MatrizConfusao$byClass['F1']
+    
+    # Imprimir as métricas de cada fold
+    cat("Fold:", i, "\n")
+    cat("Acurácia:", metricas_df[i, "Acuracia"], "\n")
+    cat("Sensibilidade:", metricas_df[i, "Sensibilidade"], "\n")
+    cat("Especificidade:", metricas_df[i, "Especificidade"], "\n")
+    cat("Precisão:", metricas_df[i, "Precisao"], "\n")
+    cat("F1 Pontuação:", metricas_df[i, "F1_Pontuacao"], "\n")
+    cat("----------------------\n")
+    
+    # plotar um por um
+    readline(prompt = "Pressione Enter no console para continuar para o próximo fold :) ...")
+  }
   
   # Gerar os nomes das métricas em português
-  metricas_df_long <- reshape2::melt(as.data.frame(metricas_df))
+  metricas_df_long <- melt(as.data.frame(metricas_df))
   colnames(metricas_df_long) <- c("Métrica", "Valor")
   
-  # Substituir os nomes das métricas para português
+  # Substituir os nomes das métricas para português, ajuste para inglês ou o idioma que achar melhor.
   metricas_df_long$Métrica <- factor(metricas_df_long$Métrica, 
                                      levels = c("Acuracia", "Sensibilidade", "Especificidade", "Precisao", "F1_Pontuacao"),
                                      labels = c("Acurácia", "Sensibilidade", "Especificidade", "Precisão", "F1"))
-  # Gerar gráficos individuais para cada métrica
+  
+  # Gerando gráficos 
   for (metrica in unique(metricas_df_long$Métrica)) {
     grafico_individual <- ggplot(subset(metricas_df_long, Métrica == metrica), aes(x = Métrica, y = Valor)) + 
       geom_boxplot(fill = "lightblue", color = "darkblue", outlier.color = "red", outlier.shape = 16) + 
@@ -205,122 +151,141 @@ treinar_e_avaliar <- function(indice_treino, indice_teste, dados) {
     
     # Exibir gráfico
     print(grafico_individual)
+    
+    # Exibir gráficos
+    readline(prompt = "Pressione Enter no console para ver o próximo gráfico :) ...")
   }
+  
+  # Gerando Intervalo de Confiança
+  intervalos_conf <- data.frame(
+    Métricas = colnames(metricas_df),
+    Média = colMeans(metricas_df),
+    IC_Inf = apply(metricas_df, 2, function(x) mean(x) - qt(0.975, df = num_folds - 1) * sd(x) / sqrt(num_folds)),
+    IC_Sup = apply(metricas_df, 2, function(x) mean(x) + qt(0.975, df = num_folds - 1) * sd(x) / sqrt(num_folds))
+  )
+  
+  # Gráfico de intervalos de confiança
+  ggplot(intervalos_conf, aes(x = Métricas, y = Média)) + 
+    geom_point() +
+    geom_errorbar(aes(ymin = IC_Inf, ymax = IC_Sup), width = 0.2) +
+    labs(title = "Intervalos de Confiança das Métricas de Desempenho",
+         x = "Métricas",
+         y = "Valores") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # ângulo dos textos no eixo x
+}
+# Chamando a função
+treinar_e_avaliar(amostras_atributos)
+
+------------------------------------------------------------
+  #   4 -    ==== PREDIÇÃO ==== 
+
+# Verificar se o modelo foi treinado certo e se a imagem está em raster
+if (!is.null(filtrpart) && inherits(img, "Raster")) {
+  
+  # Prever
+  rpart.pred <- raster::predict(img, filtrpart, progress = "text", type = "class", na.rm = TRUE)
+  
+  # Plotar o resultado =
+  plot(rpart.pred, main = "Predição do Modelo rpart", col = viridis(2))  #
+  
+  # Nomear o arquivo a ser salvo...
+  output_file <- "Class_rpart_Todos_atbA2if.tif"
+  
+  # Se o arquivo existir, perguntar se deseja salvar por cima
+  if (file.exists(output_file)) {
+    message("O arquivo já existe. Deseja salvar por cima? (s/n)")
+    resposta <- readline()
+    if (tolower(resposta) != "s") {
+      message("O arquivo não foi salvo.")
+    } else {
+      writeRaster(rpart.pred, filename = output_file, overwrite = TRUE)
+      message("Arquivo salvo com o nome: ", output_file)
+    }
+  } else {
+    writeRaster(rpart.pred, filename = output_file, overwrite = TRUE)
+    message("Arquivo salvo com o nome: ", output_file)
+  }
+  
+} else {
+  message("Erro: O modelo ou a imagem não estão no formato esperado.")
 }
 
-# Gerar Intervalo de Confiança
-intervalos_conf <- data.frame(
-  Métricas = colnames(metricas_df),
-  Média = colMeans(metricas_df),
-  IC_Inf = apply(metricas_df, 2, function(x) mean(x) - qt(0.975, df = num_folds - 1) * sd(x) / sqrt(num_folds)),
-  IC_Sup = apply(metricas_df, 2, function(x) mean(x) + qt(0.975, df = num_folds - 1) * sd(x) / sqrt(num_folds))
-)
-
-ggplot(intervalos_conf, aes(x = Métricas, y = Média)) + 
-  geom_point() +
-  geom_errorbar(aes(ymin = IC_Inf, ymax = IC_Sup), width = 0.2) +
-  labs(title = "Intervalos de Confiança das Métricas de Desempenho",
-       x = "Métricas",
-       y = "Valores") +
-  theme_minimal()
-
-#gráfico
-ggplot(intervalos_conf, aes(x = Métricas, y = Média)) + 
-  geom_point() +
-  geom_errorbar(aes(ymin = IC_Inf, ymax = IC_Sup), width = 0.2) +
-  labs(title = "Intervalos de Confiança das Métricas de Desempenho",
-       x = "Métricas",
-       y = "Valores") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))  #  ângulo dos textos no eixo x
-  
-# ======= 7 - Plotar com o partykit e prever de novo ======
-
-# Carregar bibliotecas
-
-install.packages("partykit")
-library(partykit)
-
-# Converter para uma estrutura de árvore compatível com o partykit
-filtrpart_partykit <- as.party(filtrpart)
-
-# Plotar a árvore de decisão com todas as informações
-plot(filtrpart_partykit)
-print(filtrpart_partykit)
+rpart.pred_values <- raster::values(rpart.pred)
 
 
-
-
-rpart.pred <- raster::predict(img, filtrpart, progress = "text", type = "class")
-
-plot(rpart.pred)
-writeRaster(rpart.pred, "Class_rpart_Todos_atbA2MEDIA.tif", overwrite = TRUE)
-
-
-
-## ==========  MCC ====
+#   5 -  ==== AVALIAÇÃO/TESTE ==== 
 
 # Função para calcular o MCC
 calcular_mcc <- function(vp, vn, fp, fn) {
-  # Calcula o numerador e denominador
   numerador <- (vp * vn) - (fp * fn)
   denominador <- sqrt((vp + fp) * (vp + fn) * (vn + fp) * (vn + fn))
   
-  # Verifica se o denominador é zero para evitar divisão por zero
   if (denominador == 0) {
     return(0)
   }
   
-  # Calcula o MCC
   mcc <- numerador / denominador
   return(mcc)
 }
+# Avaliando o modelo com amostras aleatórias
 
-vp <- 292
-vn <- 92
-fp <- 12
-fn <- 104
+avaliar_modelo <- function(caminho_amostras, img, rpart_pred) {
+  # Carregar as amostras aleatórias
+  amostras_aleatorias <- st_read(caminho_amostras)  
+  
+  # Verificar se a coluna "Classe" existe na camada
+  if (!"Classe" %in% colnames(amostras_aleatorias)) {
+    stop("A coluna 'Classe' não existe.")
+  }
+  
+  # Transformar CRS das amostras
+  amostras_aleatorias <- st_transform(amostras_aleatorias, crs(rpart_pred))
+  
+  # Extrair os valores do raster preditos pelo rpart
+  valores_preditos <- raster::extract(rpart_pred, amostras_aleatorias)
+  
+  # Obter os valores da amostra
+  valores_reais <- amostras_aleatorias$Classe
+  
+  # Calcular as métricas de desempenho
+  # Atenção aos números usado para as classes e altere se necessário, neste caso, 1 representa nuvens/sombras e 2 representa outras coberturas
+  vp <- sum(valores_preditos == 1 & valores_reais == 1, na.rm = TRUE)
+  vn <- sum(valores_preditos == 2 & valores_reais == 2, na.rm = TRUE)
+  fp <- sum(valores_preditos == 1 & valores_reais == 2, na.rm = TRUE)
+  fn <- sum(valores_preditos == 2 & valores_reais == 1, na.rm = TRUE)
+  
+  # Acurácia Global
+  ag <- (vp + vn) / (vp + vn + fp + fn)
+  
+  # Sensibilidade
+  sensibilidade <- ifelse((vp + fn) == 0, 0, vp / (vp + fn))
+  
+  # Precisão
+  precisao <- ifelse((vp + fp) == 0, 0, vp / (vp + fp))
+  
+  # F1-Score
+  f1 <- ifelse((precisao + sensibilidade) == 0, 0, 2 * (precisao * sensibilidade) / (precisao + sensibilidade))
+  
+  # Especificidade
+  especificidade <- ifelse((vn + fp) == 0, 0, vn / (vn + fp))
+  
+  # Matthew Correlation Coefficient
+  mcc <- calcular_mcc(vp, vn, fp, fn)
+  
+  resultados <- list(
+    Acuracia = ag,
+    Sensibilidade = sensibilidade,
+    Precisao = precisao,
+    F1 = f1,
+    Especificidade = especificidade,
+    Falsos_Positivos = fp,
+    Falsos_Negativos = fn,
+    MCC = mcc
+  )
+  
+  return(resultados)
+}
+resultados <- avaliar_modelo("Insira aqui o local das suas amostras de teste", img, rpart.pred)
+print(resultados)
 
-# Calcula e imprime o MCC
-mcc_resultado <- calcular_mcc(vp, vn, fp, fn)
-cat("O valor do MCC é:", mcc_resultado, "\n")
-
-
-MCC A2 - 0.7503242
-MCC A3 - 0.738615 
-MCC SCL - 0.5171092 
-
-# Dados
-modelos <- c("Árvore 2", "Árvore 3", "SCL")
-mcc <- c(0.7503242, 0.738615, 0.5171092)
-falsos_positivos <- c(16, 17, 12)  
-falsos_negativos <- c(27, 28, 104)  
-
-# Criar um data frame para o MCC
-df_mcc <- data.frame(Modelo = modelos, MCC = mcc)
-
-# Criar um data frame para FP e FN
-df_fp_fn <- data.frame(Modelo = modelos, Falsos_Positivos = falsos_positivos, Falsos_Negativos = falsos_negativos)
-
-# Gráfico para MCC
-p1 <- ggplot(df_mcc, aes(x = Modelo, y = MCC, group = 1)) +
-  geom_line(color = "#FFA500", size = 1) +  # Cor laranja
-  geom_point(color = "#FFA500", size = 4) +
-  labs(title = "Comparação do MCC entre modelos", x = "Modelo", y = "MCC") +
-  ylim(0, 1) +
-  theme_minimal(base_size = 15) +
-  theme(plot.title = element_text(hjust = 0.5))
-
-# Gráfico para FPs e FNs com a legenda renomeada
-p2 <- ggplot(df_fp_fn, aes(x = Modelo)) +
-  geom_line(aes(y = Falsos_Positivos, color = "Falsos Positivos"), size = 1) +
-  geom_point(aes(y = Falsos_Positivos, color = "Falsos Positivos"), size = 4) +
-  geom_line(aes(y = Falsos_Negativos, color = "Falsos Negativos"), size = 1) +
-  geom_point(aes(y = Falsos_Negativos, color = "Falsos Negativos"), size = 4) +
-  labs(title = "Comparação dos Falsos Positivos e Falsos Negativos", x = "Modelo", y = "Quantidade") +
-  scale_color_manual(name = "Métricas", values = c("Falsos Positivos" = "#4682B4", "Falsos Negativos" = "#B22222")) +  # Cores azul e vermelho
-  theme_minimal(base_size = 15) +
-  theme(plot.title = element_text(hjust = 0.5))
-
-# Combinar os gráficos
-grid.arrange(p1, p2, ncol = 2)
