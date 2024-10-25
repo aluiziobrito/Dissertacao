@@ -26,7 +26,7 @@ Para instalar os pacotes necessários, execute:
 
 ```R
 # Lista de pacotes necessários
-neededPackages = c("raster", "stats", "sf", "ggplot2", "sp", "dplyr", "tidyr", "ROCR",
+neededPackages = c("terra", "raster", "stats", "sf", "ggplot2", "sp", "dplyr", "tidyr", "ROCR",
                    "reshape2", "randomForest", "caret", "caTools", "geobr", "prettymapr", 
                    "tidyselect", "rpart", "rpart.plot", "partykit")
 
@@ -67,7 +67,7 @@ To install the required packages, run:
 
 ```R
 # List of required packages
-neededPackages = c("raster", "stats", "sf", "ggplot2", "sp", "dplyr", "tidyr", "ROCR",
+neededPackages = c("terra", "raster", "stats", "sf", "ggplot2", "sp", "dplyr", "tidyr", "ROCR",
                    "reshape2", "randomForest", "caret", "caTools", "geobr", "prettymapr", 
                    "tidyselect", "rpart", "rpart.plot", "partykit")
 
