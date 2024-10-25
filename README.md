@@ -4,14 +4,16 @@ Este projeto é parte do trabalho de dissertação e inclui um conjunto de códi
 
 O conjunto de códigos inclui:
 
-I - O arquivo "Det_n_s_final.R", que contém o código para a detecção e criação da máscara de nuvens e sombras utilizando o classificador por árvores de decisão Rpart.
+I - O arquivo **"Det_n_s_final.R"**, que contém o código para a detecção e criação da máscara de nuvens e sombras utilizando o classificador por árvores de decisão Rpart. Além do arquivo **"Clouds_Shadows_Mask.md"**, com um detalhamento auxiliar para o código.
 
-II - O arquivo "RF1.R", que inclui todas as etapas (parametrização, amostragem, classificação e avaliação) do mapeamento das áreas inundadas utilizando o classificador Random Forest.
+II - O arquivo **"RF1.R"**, que inclui todas as etapas (parametrização, amostragem, classificação e avaliação) do mapeamento das áreas inundadas utilizando o classificador Random Forest. 
 
-III - O arquivo "RF2.R", que inclui todas as etapas (parametrização, amostragem, classificação e avaliação) do mapeamento das áreas inundáveis utilizando o classificador Random Forest.
+III - O arquivo **"RF2.R"**, que inclui todas as etapas (parametrização, amostragem, classificação e avaliação) do mapeamento das áreas inundáveis utilizando o classificador Random Forest.
+
+Para os códigos **"RF1.R"** e  **"RF2.R**, o arquivo **Floods.md**  contém a documentação auxiliar. 
 
 Qualquer referência ao código e ao trabalho pode ser feita em:
-MAIA, A. B. Detecção de Áreas Inundadas Com Cobertura de Nuvem em Sistemas Ópticos: Integração com o Modelo Digital de Elevação. Dissertação (Mestrado em Sensoriamento Remoto) - Instituto Nacional de Pesquisas Espaciais (INPE), São José dos Campos, 2025.
+**MAIA, A. B**. Detecção de Áreas Inundadas Com Cobertura de Nuvem em Sistemas Ópticos: Integração com o Modelo Digital de Elevação. Dissertação (Mestrado em Sensoriamento Remoto) - Instituto Nacional de Pesquisas Espaciais (INPE), São José dos Campos, 2025.
 
 Sinta-se à vontade para contribuir! Se você tiver sugestões, não hesite em abrir uma issue ou um pull request.
 
@@ -47,11 +49,13 @@ This project is part of the masters thesis work and includes a set of codes in R
 
 The set of codes includes:
 
-I - The file **"Det_n_s_final.R"**, which contains the code for detecting and creating the cloud and shadow mask using the Rpart decision tree classifier.
+I - The file **"Det_n_s_final.R"**, which contains the code for detecting and creating the cloud and shadow mask using the Rpart decision tree classifier. Also, it includes the 'Clouds_Shadows_Mask.md' file, which provides documentation and supplementary details for the code.
 
 II - The file **"RF1.R"**, which includes all stages (parameterization, sampling, classification, and evaluation) of mapping flooded areas using the Random Forest classifier.
 
 III - The file **"RF2.R"**, which includes all stages (parameterization, sampling, classification, and evaluation) of mapping flood-prone areas using the Random Forest classifier.
+
+For the codes **'RF1.R'** and **'RF2.R'**, the Floods.md file contains the supplementary documentation.
 
 Any reference to the code and the work can be made in:
 **MAIA, A. B.** Detection of Flooded Areas Under Cloud Cover in Optical Systems: Integration with Digital Elevation Model. Dissertation (Master’s in Remote Sensing) - National Institute for Space Research (INPE), São José dos Campos, 2025.
