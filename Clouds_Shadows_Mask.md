@@ -31,13 +31,13 @@ Como alternativa à geração dos atributos por um SIG, o código abaixo calcula
 ```r
 # Carregando as bandas do MSI/Sentinel-2 que serão utilizadas 
 
-B2 <- rast("caminho/para/B2.tif")
-B3 <- rast("caminho/para/B3.tif")
-B4 <- rast("caminho/para/B4.tif")
-B8 <- rast("caminho/para/B8.tif")
-B8A <- rast("caminho/para/B8A.tif")
-B9 <- rast("caminho/para/B9.tif")
-B11 <- rast("caminho/para/B11.tif")
+B2 <- rast("caminho-B2.tif")
+B3 <- rast("caminho-B3.tif")
+B4 <- rast("caminho-B4.tif")
+B8 <- rast("caminho-B8.tif")
+B8A <- rast("caminho-B8A.tif")
+B9 <- rast("caminho-B9.tif")
+B11 <- rast("caminho-B11.tif")
 
 # Calculando os atributos espectrais
 HOT <- B2 - (0.45 * B4) - 0.08
@@ -46,7 +46,7 @@ WI <- ( (B2 - M) / M ) + ( (B3 - M) / M ) + ( (B4 - M) / M )
 Cloud Index <- (B8 + (2 * B11) / (B2 + B3 + B4)
 WV <- B2 - (0.45 * B4) - (0.32 * B9)
 SWIR_SCD <- B2 - (0.45 * B4) - (0.32 * B11)
-NIR-SCD <- B2− (0,45 * B4) − (0,16* NIR)
+NIR-SCD <- B2− (0,45 * B4) − (0,16* B8)
 
 # Salvar os resultados em arquivos raster
 writeRaster(HOT, "caminho", overwrite=TRUE)
@@ -57,28 +57,41 @@ writeRaster(SWIR_SCD, "caminho", overwrite=TRUE)
 
 ```
 
-# Atributos para imagens de sensores RGB-NIR (CBERS-4, CBERS-4A, Amazonia-1, etc)
+# Atributos para imagens de sensores RGB-NIR (CBERS-4, CBERS-4A, Amazonia-1, RapidEye etc)
 
 ```r
 
 # Carregando as bandas que serão utilizadas, no exemplo, as bandas do MUX/CBERS-4A
 
+B05 <- rast("caminho-B5.tif")
+B06 <- rast("caminho-B6.tif")
+B07 <- rast("caminho-B7.tif")
+B08 <- rast("caminho-B8.tif")
 
+# Calculando os atributos espectrais
 
-B15 <- rast("caminho/para/B2.tif")
-B3 <- rast("caminho/para/B3.tif")
-B4 <- rast("caminho/para/B4.tif")
-B8 <- rast("caminho/para/B8.tif")
-B8A <- rast("caminho/para/B8A.tif")
-B9 <- rast("caminho/para/B9.tif")
-B11 <- rast("caminho/para/B11.tif")
+HOT <- B05 - (0.45 * B07) - 0.08
+M <- (0.25 * B05) + (0.375 * B06) + (0.375 * B07)
+WI <- ( (B05 - M) / M ) + ( (B06 - M) / M ) + ( (B07 - M) / M )
+Cloud Index Alternativo <- (3 * B08) / (B05 + B06 + B07)
+NIR-SCD <- B05− (0,45 * B07) − (0,16 * B08)
+NDWI <- B07 - B08 / B07 + B08
+
+# Salvar os resultados em arquivos raster
+
+writeRaster(HOT, "HOT.tif", overwrite=TRUE)
+writeRaster(M, "M.tif", overwrite=TRUE)
+writeRaster(WI, "WI.tif", overwrite=TRUE)
+writeRaster(Cloud_Index_Alternativo, "Cloud_Index_Alternativo.tif", overwrite=TRUE)
+writeRaster(NIR_SCD, "NIR_SCD.tif", overwrite=TRUE)
+writeRaster(NDWI, "NDWI.tif", overwrite=TRUE)
 
 ```
 
 
 
 # REFERÊNCIAS 
-GóMEZ-CHOVA, L. et al. Cloud-screening algorithm for envisat/meris multispectral images. IEEE Transactions on Geoscience and Remote Sensing, v. 45, n. 12, p. 4105–4118, 2007. 8
+GÓMEZ-CHOVA, L. et al. Cloud-screening algorithm for envisat/meris multispectral images. IEEE Transactions on Geoscience and Remote Sensing, v. 45, n. 12, p. 4105–4118, 2007. 8
 
 ZHAI, H.; ZHANG, H.; ZHANG, L.; LI, P. Cloud/shadow detection based on spectral indices for multi/hyperspectral optical remote sensing imagery. ISPRS Journal of Photogrammetry and Remote Sensing, v. 144, p. 235–253, 2018.
 
