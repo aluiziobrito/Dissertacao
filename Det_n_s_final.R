@@ -1,7 +1,7 @@
 # 1 -    ==== CARREGAR OS ATRIBUTOS ESPECTRAIS ==== 
 
 # Definir o diretório onde os arquivos estão localizados
-dir_path <- "Insira aqui seu diretório"
+dir_path <- "Insira aqui o seu diretório"
 
 # Listar todos os arquivos .tif na pasta
 files_list <- list.files(path = dir_path, pattern = "\\.tif$", full.names = TRUE)
@@ -15,7 +15,7 @@ print(rasters_list)
 
 # Criar o stack com os rasters da lista
   # Para detalhes sobre os atributos, consulte o Mark Down Clouds_Shadows_Mask.md
-img <- stack(rasters_list[["WV"]],    
+img <- stack(rasters_list[["Wv"]],    
              rasters_list[["WI"]],     
              rasters_list[["HOT"]],    
              rasters_list[["SWIR_SCD"]], 
@@ -28,7 +28,7 @@ plot(img)
 # 2 -    ==== ETAPA DE AMOSTRAGEM ==== 
 
 # Carregar os shapefiles e padronizar o CRS para todos
-amostras <- list.files("D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\Amostras_Final", 
+amostras <- list.files("Insira aqui o diretório das suas amostras", 
                        pattern = ".shp", full.names = TRUE) %>%
   lapply(st_read) %>%
   lapply(function(x) st_transform(x, st_crs(4326))) # O CRS WGS84 está como exemplo, ajuste conforme necessário
@@ -95,7 +95,7 @@ treinar_e_avaliar <- function(dados) {
         maxdepth = 20
       )
     )
-    
+  
     # Avaliar
     classe_predita <- predict(filtrpart, dados_teste, type = "class")
     
@@ -179,6 +179,23 @@ treinar_e_avaliar(amostras_atributos)
 
 ------------------------------------------------------------
   #   4 -    ==== PREDIÇÃO ==== 
+
+filtrpart <- rpart(
+  Classe ~ ., 
+  data = treino_amostras,
+  method = "class",
+  control = rpart.control(
+    minsplit = 10,
+    minbucket = round(10 / 3),
+    cp = 0.001,
+    maxcompete = 4, 
+    maxsurrogate = 1,
+    usesurrogate = 2, 
+    xval = 0,  
+    surrogatestyle = 0, 
+    maxdepth = 20
+  )
+)
 
 # Verificar se o modelo foi treinado certo e se a imagem está em raster
 if (!is.null(filtrpart) && inherits(img, "Raster")) {
