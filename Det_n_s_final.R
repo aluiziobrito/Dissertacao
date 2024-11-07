@@ -1,7 +1,7 @@
 # 1 -    ==== CARREGAR OS ATRIBUTOS ESPECTRAIS ==== 
 
 # Definir o diretório onde os arquivos estão localizados
-dir_path <- "Insira aqui o seu diretório"
+dir_path <- "D:\\Dissertação\\Nuvens e Sombras\\Atributos_Teste"
 
 # Listar todos os arquivos .tif na pasta
 files_list <- list.files(path = dir_path, pattern = "\\.tif$", full.names = TRUE)
@@ -14,7 +14,7 @@ names(rasters_list) <- tools::file_path_sans_ext(basename(files_list))
 print(rasters_list)
 
 # Criar o stack com os rasters da lista
-  # Para detalhes sobre os atributos, consulte o Mark Down Clouds_Shadows_Mask.md
+# Para detalhes sobre os atributos, consulte o Mark Down Clouds_Shadows_Mask.md
 img <- stack(rasters_list[["Wv"]],    
              rasters_list[["WI"]],     
              rasters_list[["HOT"]],    
@@ -28,7 +28,7 @@ plot(img)
 # 2 -    ==== ETAPA DE AMOSTRAGEM ==== 
 
 # Carregar os shapefiles e padronizar o CRS para todos
-amostras <- list.files("Insira aqui o diretório das suas amostras", 
+amostras <- list.files("D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\Amostras_Final", 
                        pattern = ".shp", full.names = TRUE) %>%
   lapply(st_read) %>%
   lapply(function(x) st_transform(x, st_crs(4326))) # O CRS WGS84 está como exemplo, ajuste conforme necessário
@@ -95,7 +95,7 @@ treinar_e_avaliar <- function(dados) {
         maxdepth = 20
       )
     )
-  
+    
     # Avaliar
     classe_predita <- predict(filtrpart, dados_teste, type = "class")
     
@@ -176,6 +176,7 @@ treinar_e_avaliar <- function(dados) {
 }
 # Chamando a função
 treinar_e_avaliar(amostras_atributos)
+summary(filtrpart)
 
 ------------------------------------------------------------
   #   4 -    ==== PREDIÇÃO ==== 
@@ -303,6 +304,38 @@ avaliar_modelo <- function(caminho_amostras, img, rpart_pred) {
   
   return(resultados)
 }
-resultados <- avaliar_modelo("Insira aqui o local das suas amostras de teste", img, rpart.pred)
+resultados <- avaliar_modelo("D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\Amostras_teste", img, rpart.pred)
 print(resultados)
+
+#   6 -  ==== Funções de Probabilidade e Classificação baseada na Probabilidade ====
+
+# Extrai as probabilidades de classe
+rpart.pred_prob <- raster::predict(img, filtrpart, progress = "text", type = "prob", na.rm = TRUE)
+
+# Visualiza a probabilidade da primeira classe pra ver se está tudo certinho
+plot(rpart.pred_prob[[1]], main = "Probabilidade Classe 1")
+
+# Salva o raster de probabilidades
+probs <- "D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\probabilidade_classe.tif"
+writeRaster(rpart.pred_prob, filename = probs, overwrite = TRUE)
+
+# limiar de probabilidade escolhido
+limiar_prob = 0.8
+
+# Classificação com base na probabilidade da segunda classe (classe 2)
+rpart.pred_class_prob <- calc(rpart.pred_prob, fun = function(x) {
+  prob_classe <- x[1]  
+  
+  # Aplica a condição de probabilidade: se maior que o limiar, classifica como "nuvem", caso contrário, "superfície"
+  ifelse(prob_classe > limiar_prob, 1, 2)
+})
+
+plot(rpart.pred_class_prob, main = paste("Classificação com Limiar de Probabilidade de", limiar_prob))
+writeRaster(rpart.pred_class_prob, filename = "D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\classificacao_binaria.tif", overwrite = TRUE)
+
+
+
+
+
+
 
