@@ -308,7 +308,6 @@ resultados <- avaliar_modelo("D:\\Dissertação\\Nuvens e Sombras\\Árvore de de
 print(resultados)
 
 #   6 -  ==== Funções de Probabilidade e Classificação baseada na Probabilidade ====
-
 # Extrai as probabilidades de classe
 rpart.pred_prob <- raster::predict(img, filtrpart, progress = "text", type = "prob", na.rm = TRUE)
 
@@ -319,23 +318,39 @@ plot(rpart.pred_prob[[1]], main = "Probabilidade Classe 1")
 probs <- "D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\probabilidade_classe.tif"
 writeRaster(rpart.pred_prob, filename = probs, overwrite = TRUE)
 
-# limiar de probabilidade escolhido
-limiar_prob = 0.8
 
-# Classificação com base na probabilidade da segunda classe (classe 2)
-rpart.pred_class_prob <- calc(rpart.pred_prob, fun = function(x) {
-  prob_classe <- x[1]  
+classificar_com_limiar <- function(img, filtrpart, caminho_prob, caminho_classificacao) {
+  # Solicita o limiar de probabilidade 
+  limiar_prob <- as.numeric(readline(prompt = "Digite o limiar de probabilidade (entre 0 e 1): "))
   
-  # Aplica a condição de probabilidade: se maior que o limiar, classifica como "nuvem", caso contrário, "superfície"
-  ifelse(prob_classe > limiar_prob, 1, 2)
-})
+  if (is.na(limiar_prob) || limiar_prob < 0 || limiar_prob > 1) {
+    stop("Valor inválido para o limiar de probabilidade. O valor deve ser entre 0 e 1.")
+  }
+  
+  # Extrai as probabilidades de classe
+  rpart.pred_prob <- raster::predict(img, filtrpart, progress = "text", type = "prob", na.rm = TRUE)
+  
+  # Salva o raster de probabilidades
+  writeRaster(rpart.pred_prob, filename = caminho_prob, overwrite = TRUE)
+  
+  # Classificação com base na probabilidade da primeira classe (classe 1)
+  rpart.pred_class_prob <- calc(rpart.pred_prob, fun = function(x) {
+    prob_classe <- x[1]
+    
+    # Aplica a condição de probabilidade: se maior que o limiar, classifica como "nuvem", caso contrário, "superfície"
+    ifelse(prob_classe > limiar_prob, 1, 2)
+  })
+  
+  # Visualiza o resultado da classificação
+  plot(rpart.pred_class_prob, main = paste("Classificação com Limiar de Probabilidade de", limiar_prob))
+  
+  # Salva o raster de classificação binária
+  writeRaster(rpart.pred_class_prob, filename = caminho_classificacao, overwrite = TRUE)
+}
 
-plot(rpart.pred_class_prob, main = paste("Classificação com Limiar de Probabilidade de", limiar_prob))
-writeRaster(rpart.pred_class_prob, filename = "D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\classificacao_binaria.tif", overwrite = TRUE)
-
-
-
-
-
-
-
+classificar_com_limiar(
+  img = img, 
+  filtrpart = filtrpart, 
+  caminho_prob = "D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\probabilidade_classe.tif",
+  caminho_classificacao = "D:\\Dissertação\\Nuvens e Sombras\\Árvore de decisão\\classificacao_binaria.tif"
+)
